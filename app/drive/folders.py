@@ -1,99 +1,130 @@
 import os
-from typing import List
+import json
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
-# --------------------------------------------------
-# CONFIG
-# --------------------------------------------------
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-SERVICE_ACCOUNT_FILE = os.path.join(BASE_DIR, "service_account.json")
-
+# Escopo completo do Drive
 SCOPES = ["https://www.googleapis.com/auth/drive"]
 
-# ID da pasta raiz no Drive
-PARENT_FOLDER_ID = "1kMYAs8F05dW3EFLG7Vmje0-DZDdXrpY2"
-
-
-# --------------------------------------------------
-# DRIVE SERVICE
-# --------------------------------------------------
 
 def get_drive_service():
-    if not os.path.exists(SERVICE_ACCOUNT_FILE):
-        raise FileNotFoundError(
-            f"Arquivo service_account.json não encontrado em {SERVICE_ACCOUNT_FILE}"
+    """
+    Cria o serviço do Google Drive a partir da variável de ambiente
+    GOOGLE_SERVICE_ACCOUNT_JSON
+    """
+
+    service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+
+    if not service_account_json:
+        raise RuntimeError(
+            "Variável de ambiente GOOGLE_SERVICE_ACCOUNT_JSON não configurada"
         )
 
-    credentials = service_account.Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE,
+    try:
+        credentials_info = json.loads(service_account_json)
+    except json.JSONDecodeError:
+        raise RuntimeError("GOOGLE_SERVICE_ACCOUNT_JSON não é um JSON válido")
+
+    credentials = service_account.Credentials.from_service_account_info(
+        credentials_info,
         scopes=SCOPES
     )
 
     return build("drive", "v3", credentials=credentials)
 
 
-# --------------------------------------------------
-# CRIAÇÃO DE PASTAS
-# --------------------------------------------------
+def create_folder(service, name, parent_id=None):
+    """
+    Cria uma pasta no Google Drive.
+    Se parent_id for None, cria na raiz do Drive.
+    """
+
+    file_metadata = {
+        "name": name,
+        "mimeType": "application/vnd.google-apps.folder",
+    }
+
+    if parent_id:
+        file_metadata["parents"] = [parent_id]
+
+    folder = service.files().create(
+        body=file_metadata,
+        fields="id"
+    ).execute()
+
+    return folder["id"]
+
 
 def create_area_folders(
     codigo: str,
     nome_area: str,
-    zoneamento: str,
-    agrupamentos: dict,
-    lotes_totais: List[int]
-) -> dict:
-    service = get_drive_service()
+    lotes_totais: list[int],
+):
+    """
+    Estrutura final:
 
-    area_name = f"{codigo} {nome_area} - {zoneamento}"
+    /ÁREAS
+        /000123 - Nome da Área
+            /Lotes
+                /Lote 1
+                /Lote 2
+                ...
+    """
 
-    # Pasta principal da área
-    area_folder = service.files().create(
-        body={
-            "name": area_name,
-            "mimeType": "application/vnd.google-apps.folder",
-            "parents": [PARENT_FOLDER_ID],
-        },
-        fields="id"
-    ).execute()
+    try:
+        service = get_drive_service()
 
-    area_folder_id = area_folder["id"]
+        # 🔹 Pasta raiz fixa
+        ROOT_FOLDER_NAME = "ÁREAS"
 
-    # Caso simples: sem agrupamentos
-    if not agrupamentos:
-        for lote in lotes_totais:
-            service.files().create(
-                body={
-                    "name": str(lote),
-                    "mimeType": "application/vnd.google-apps.folder",
-                    "parents": [area_folder_id],
-                }
-            ).execute()
+        # Procura se a pasta ÁREAS já existe
+        query = (
+            f"name = '{ROOT_FOLDER_NAME}' and "
+            "mimeType = 'application/vnd.google-apps.folder' and "
+            "trashed = false"
+        )
 
-        return {"area_folder_id": area_folder_id}
-
-    # Caso com agrupamentos
-    for nome_grupo, dados in agrupamentos.items():
-        grupo_folder = service.files().create(
-            body={
-                "name": nome_grupo,
-                "mimeType": "application/vnd.google-apps.folder",
-                "parents": [area_folder_id],
-            },
-            fields="id"
+        results = service.files().list(
+            q=query,
+            fields="files(id, name)",
+            spaces="drive"
         ).execute()
 
-        grupo_id = grupo_folder["id"]
+        if results.get("files"):
+            root_folder_id = results["files"][0]["id"]
+        else:
+            root_folder_id = create_folder(service, ROOT_FOLDER_NAME)
 
-        for lote in dados["lotes"]:
-            service.files().create(
-                body={
-                    "name": str(lote),
-                    "mimeType": "application/vnd.google-apps.folder",
-                    "parents": [grupo_id],
-                }
-            ).execute()
+        # 🔹 Pasta da área
+        area_folder_name = f"{codigo} - {nome_area}"
+        area_folder_id = create_folder(
+            service,
+            area_folder_name,
+            root_folder_id
+        )
 
-    return {"area_folder_id": area_folder_id}
+        # 🔹 Pasta Lotes
+        lotes_folder_id = create_folder(
+            service,
+            "Lotes",
+            area_folder_id
+        )
+
+        # 🔹 Pastas de cada lote
+        for lote in lotes_totais:
+            create_folder(
+                service,
+                f"Lote {lote}",
+                lotes_folder_id
+            )
+
+        return {
+            "root_folder_id": root_folder_id,
+            "area_folder_id": area_folder_id,
+            "lotes_folder_id": lotes_folder_id,
+        }
+
+    except HttpError as e:
+        raise RuntimeError(f"Erro ao criar pastas no Drive: {e}")
