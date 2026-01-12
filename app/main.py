@@ -14,6 +14,10 @@ from app.monday.boards import duplicate_board, populate_board_with_lotes
 from app.monday.status import set_status
 from app.monday.links import update_link_column
 from app.monday.auth import get_token_for_user
+from app.monday.groups import create_group
+from app.monday.items import create_lote_item
+from app.drive.folders import create_area_structure
+
 
 # --------------------------------------------------
 # CONFIG
@@ -71,13 +75,12 @@ async def nova_area(payload: dict = Body(...)):
     )
 
     # 🔹 Drive
-    drive = create_area_folders(
-        codigo=data["codigo"],
-        nome_area=data["nome_area"],
-        zoneamento=data["zoneamento"],
-        agrupamentos=data["agrupamentos"],
-        lotes_totais=data["lotes_totais"]
-    )
+    drive_area_id = create_area_structure(
+    codigo=data["codigo"],
+    nome_area=data["nome_area"],
+    zoneamento=data["zoneamento"],
+    agrupamentos=data["agrupamentos"]
+)
 
     # 🔹 Board (CRIA COM OWNER CORRETO)
     board_name = f"{data['codigo']} {data['nome_area']} - {data['zoneamento']}"
@@ -90,7 +93,7 @@ async def nova_area(payload: dict = Body(...)):
 
     populate_board_with_lotes(
         board_id=new_board_id,
-        lotes=data["lotes_totais"],
+        agrupamentos=data["agrupamentos"],
         token=token
     )
 
@@ -108,7 +111,7 @@ async def nova_area(payload: dict = Body(...)):
         board_id=form_board_id,
         item_id=form_item_id,
         column_id=DRIVE_LINK_COLUMN_ID,
-        url=f"https://drive.google.com/drive/folders/{drive['area_folder_id']}",
+        url=f"https://drive.google.com/drive/folders/{drive_area_id}",
         text="Pasta no Drive",
         token=token
     )

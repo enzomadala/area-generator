@@ -108,3 +108,28 @@ def create_area_folders(
 
     except HttpError as e:
         raise RuntimeError(f"Erro ao criar pastas no Drive: {e}")
+    
+def create_area_structure(
+    codigo: str,
+    nome_area: str,
+    zoneamento: str,
+    agrupamentos: dict,
+):
+    service = get_drive_service()
+
+    root_id = os.getenv("GOOGLE_DRIVE_ROOT_FOLDER_ID")
+
+    area_name = f"{codigo} {nome_area} - {zoneamento}"
+    area_id = create_folder(service, area_name, root_id)
+
+    for group_name, data in agrupamentos.items():
+        group_folder_id = create_folder(service, group_name, area_id)
+
+        for lote in data["lotes"]:
+            create_folder(
+                service,
+                f"Lote {lote}",
+                group_folder_id
+            )
+
+    return area_id

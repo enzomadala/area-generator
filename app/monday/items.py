@@ -84,3 +84,25 @@ def update_text_column(
 
     if "errors" in result:
         raise Exception(result["errors"])
+
+
+def create_lote_item(board_id, group_id, lote, token):
+    query = """
+    mutation ($board: Int!, $group: String!, $name: String!) {
+      create_item (
+        board_id: $board,
+        group_id: $group,
+        item_name: $name
+      ) {
+        id
+      }
+    }
+    """
+
+    variables = {
+        "board": board_id,
+        "group": group_id,
+        "name": f"Lote {lote}"
+    }
+
+    monday_request(query, variables, token)

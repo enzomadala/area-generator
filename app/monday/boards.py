@@ -1,4 +1,6 @@
 import requests
+from app.monday.groups import create_group
+from app.monday.items import create_lote_item
 
 MONDAY_API_URL = "https://api.monday.com/v2"
 
@@ -38,34 +40,14 @@ def duplicate_board(template_id: int, name: str, token: str) -> int:
     return int(data["data"]["duplicate_board"]["board"]["id"])
 
 
-def populate_board_with_lotes(board_id: int, lotes: list[int], token: str):
-    query = """
-    mutation ($board_id: ID!, $name: String!) {
-      create_item(board_id: $board_id, item_name: $name) {
-        id
-      }
-    }
-    """
+def populate_board_with_lotes(board_id: int, agrupamentos: dict, token: str):
+    for group_name, data in agrupamentos.items():
+        group_id = create_group(board_id, group_name, token)
 
-    headers = {
-        "Authorization": token,
-        "Content-Type": "application/json"
-    }
-
-    for lote in lotes:
-        response = requests.post(
-            MONDAY_API_URL,
-            json={
-                "query": query,
-                "variables": {
-                    "board_id": board_id,
-                    "name": str(lote)
-                }
-            },
-            headers=headers
-        )
-
-        data = response.json()
-
-        if "errors" in data:
-            raise Exception(f"Erro ao criar lote {lote}: {data['errors']}")
+        for lote in data["lotes"]:
+            create_lote_item(
+                board_id=board_id,
+                group_id=group_id,
+                lote=lote,
+                token=token
+            )

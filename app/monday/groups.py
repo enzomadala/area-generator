@@ -1,28 +1,18 @@
 from app.monday.client import monday_request
 
+def create_group(board_id: int, group_name: str, token: str) -> str:
+    query = """
+    mutation ($board: Int!, $title: String!) {
+      create_group (board_id: $board, group_name: $title) {
+        id
+      }
+    }
+    """
 
-def create_groups(board_id: int, agrupamentos: dict, token: str) -> dict:
-    group_map = {}
+    variables = {
+        "board": board_id,
+        "title": group_name
+    }
 
-    for nome_grupo in agrupamentos.keys():
-        query = """
-        mutation ($board_id: ID!, $group_name: String!) {
-          create_group(board_id: $board_id, group_name: $group_name) {
-            id
-          }
-        }
-        """
-
-        variables = {
-            "board_id": board_id,
-            "group_name": nome_grupo
-        }
-
-        result = monday_request(query, variables, token)
-
-        if "errors" in result:
-            raise Exception(f"Erro ao criar grupo '{nome_grupo}': {result['errors']}")
-
-        group_map[nome_grupo] = result["data"]["create_group"]["id"]
-
-    return group_map
+    data = monday_request(query, variables, token)
+    return data["data"]["create_group"]["id"]
