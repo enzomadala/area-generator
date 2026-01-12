@@ -1,7 +1,6 @@
 import os
 from fastapi import FastAPI, Body
 from dotenv import load_dotenv
-from app.monday.auth import get_token_for_user
 
 load_dotenv()
 
@@ -14,13 +13,13 @@ from app.drive.folders import create_area_folders
 from app.monday.boards import duplicate_board, populate_board_with_lotes
 from app.monday.status import set_status
 from app.monday.links import update_link_column
+from app.monday.auth import get_token_for_user
 
 # --------------------------------------------------
-# CONFIG (com validação)
+# CONFIG
 # --------------------------------------------------
 
 TEMPLATE_BOARD_ID_RAW = os.getenv("MONDAY_TEMPLATE_BOARD_ID")
-
 
 if not TEMPLATE_BOARD_ID_RAW:
     raise RuntimeError("Variável MONDAY_TEMPLATE_BOARD_ID não configurada")
@@ -47,17 +46,18 @@ async def nova_area(payload: dict = Body(...)):
     event = payload.get("event", {})
     column_values = event.get("columnValues")
 
-    # 🔹 Ignora eventos que não são formulário
     if not column_values:
         print("⚠️ Evento ignorado (sem columnValues)")
         return {"status": "ignored"}
 
-    user_id = event["userId"]
-    token = get_token_for_user(user_id)
-
     # 🔹 Parse
     data = parse_payload(payload)
     print("🧠 DADOS PARSEADOS:", data)
+
+    sender_user_id = data["sender_user_id"]
+
+    # 🔹 TOKEN DO USUÁRIO QUE ENVIOU
+    token = get_token_for_user(sender_user_id)
 
     form_board_id = event["boardId"]
     form_item_id = event["pulseId"]
@@ -79,8 +79,9 @@ async def nova_area(payload: dict = Body(...)):
         lotes_totais=data["lotes_totais"]
     )
 
-    # 🔹 Board
-    board_name = f"{data['codigo']} - {data['nome_area']}"
+    # 🔹 Board (CRIA COM OWNER CORRETO)
+    board_name = f"{data['codigo']} {data['nome_area']} - {data['zoneamento']}"
+
     new_board_id = duplicate_board(
         TEMPLATE_BOARD_ID,
         board_name,
@@ -93,7 +94,7 @@ async def nova_area(payload: dict = Body(...)):
         token=token
     )
 
-    # 🔹 Links no form
+    # 🔹 Links no formulário
     update_link_column(
         board_id=form_board_id,
         item_id=form_item_id,
