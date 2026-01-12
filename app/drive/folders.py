@@ -79,7 +79,7 @@ def create_area_folders(
             raise RuntimeError("GOOGLE_DRIVE_ROOT_FOLDER_ID não configurada")
 
         # Pasta da área
-        area_folder_name = f"{codigo} - {nome_area} ({zoneamento})"
+        area_folder_name = f"{codigo} {nome_area} - {zoneamento}"
         area_folder_id = create_folder(
             service,
             area_folder_name,
