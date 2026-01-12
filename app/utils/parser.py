@@ -1,80 +1,158 @@
-def parse_lotes(text: str) -> list[int]:
+def parse_lotes(text: str):
+    """
+    Converte '1,2,3,4' -> [1,2,3,4]
+    """
     if not text:
         return []
 
     return [
-        int(l.strip())
-        for l in text.split(",")
-        if l.strip().isdigit()
+        int(x.strip())
+        for x in text.split(",")
+        if x.strip().isdigit()
     ]
 
 
-def parse_condominios(text: str) -> dict:
-    grupos = {}
+def parse_condominios(text: str):
+    """
+    Converte:
+    CD02: 10,11,12
+    CD03: 13,14
+
+    Em:
+    {
+        "Condomínio - CD02": {"lotes": [10,11,12]},
+        "Condomínio - CD03": {"lotes": [13,14]}
+    }
+    """
+    agrupamentos = {}
 
     if not text:
-        return grupos
+        return agrupamentos
 
-    for line in text.splitlines():
-        if ":" not in line:
+    linhas = text.splitlines()
+
+    for linha in linhas:
+        if ":" not in linha:
             continue
 
-        nome, lotes = line.split(":", 1)
-        grupos[f"Condomínio - {nome.strip()}"] = {
-            "lotes": parse_lotes(lotes)
-        }
+        nome, lotes = linha.split(":", 1)
+        nome = nome.strip()
+        lotes = parse_lotes(lotes)
 
-    return grupos
+        if nome and lotes:
+            agrupamentos[f"Condomínio - {nome}"] = {
+                "lotes": lotes
+            }
+
+    return agrupamentos
 
 
 def parse_payload(payload: dict) -> dict:
-    cols = payload["event"]["columnValues"]
+    event = payload.get("event", {})
+    column_values = event.get("columnValues", {})
 
-    tipo_area = cols["single_selectr9ae201"]["label"]["text"]
+    # --------------------------------------------------
+    # CAMPOS BÁSICOS
+    # --------------------------------------------------
+
+    codigo = column_values.get("short_text7oz7a7oh", {}).get("value", "")
+    nome_area = column_values.get("short_textofxi61f1", {}).get("value", "")
+    zoneamento = (
+        column_values.get("single_selectnlw6vqs", {})
+        .get("label", {})
+        .get("text", "")
+    )
+
+    tipo_area = (
+        column_values.get("single_selectr9ae201", {})
+        .get("label", {})
+        .get("text", "")
+    )
+
+    lotes_totais_text = column_values.get("long_textkidkii73", {}).get("text", "")
+    lotes_totais = parse_lotes(lotes_totais_text)
+
+    # --------------------------------------------------
+    # SENDER (quem enviou o formulário)
+    # --------------------------------------------------
+
+    sender_user_id = None
+
+    people_column = column_values.get("peoplel58mn9a9")
+    if people_column:
+        persons = people_column.get("personsAndTeams", [])
+        if persons:
+            sender_user_id = persons[0]["id"]
+
+    # --------------------------------------------------
+    # AGRUPAMENTOS
+    # --------------------------------------------------
 
     agrupamentos = {}
-    lotes_totais = set()
 
-    # 🔹 Área padrão
+    # 🔹 ÁREA PADRÃO
     if "ÁREA PADRÃO" in tipo_area:
-        lotes = parse_lotes(cols["long_textkidkii73"]["text"])
-        agrupamentos["Área Padrão"] = {"lotes": lotes}
-        lotes_totais.update(lotes)
+        agrupamentos["Área Padrão"] = {
+            "lotes": lotes_totais
+        }
 
-    # 🔹 Vila
-    if "VILA" in tipo_area:
-        nome_vila = cols["long_textiiu35ze7"]["text"]
-        lotes_vila = parse_lotes(cols["long_textvmy33h5o"]["text"])
+    # 🔹 SOMENTE CONDOMÍNIOS
+    if tipo_area == "SOMENTE CONDOMÍNIOS":
+        condominios_text = column_values.get("long_textaq7lqsp3", {}).get("text", "")
+        agrupamentos.update(parse_condominios(condominios_text))
 
-        if nome_vila:
-            key = f"Vila - {nome_vila}"
-            agrupamentos[key] = {"lotes": lotes_vila}
-            lotes_totais.update(lotes_vila)
+    # 🔹 ÁREA PADRÃO + CONDOMÍNIO
+    if tipo_area == "ÁREA PADRÃO + CONDOMÍNIO":
+        nome_condominio = column_values.get("short_textwh526rz4", {}).get("value", "")
+        lotes_condominio_text = column_values.get("long_textqwhsfkab", {}).get("text", "")
+        lotes_condominio = parse_lotes(lotes_condominio_text)
 
-    # 🔹 Condomínio
-    if "CONDOMÍNIO" in tipo_area:
-        # múltiplos condomínios
-        if tipo_area == "SOMENTE CONDOMÍNIOS":
-            grupos = parse_condominios(cols["long_textaq7lqsp3"]["text"])
-            agrupamentos.update(grupos)
+        if nome_condominio and lotes_condominio:
+            agrupamentos[f"Condomínio - {nome_condominio}"] = {
+                "lotes": lotes_condominio
+            }
 
-            for g in grupos.values():
-                lotes_totais.update(g["lotes"])
+    # 🔹 ÁREA PADRÃO + VILA
+    if tipo_area == "ÁREA PADRÃO + VILA":
+        nome_vila = column_values.get("long_textiiu35ze7", {}).get("text", "")
+        lotes_vila_text = column_values.get("long_textvmy33h5o", {}).get("text", "")
+        lotes_vila = parse_lotes(lotes_vila_text)
 
-        # único condomínio
-        else:
-            nome = cols["short_textwh526rz4"]["value"]
-            lotes = parse_lotes(cols["long_textqwhsfkab"]["text"])
+        if nome_vila and lotes_vila:
+            agrupamentos[f"Vila - {nome_vila}"] = {
+                "lotes": lotes_vila
+            }
 
-            key = f"Condomínio - {nome}"
-            agrupamentos[key] = {"lotes": lotes}
-            lotes_totais.update(lotes)
+    # 🔹 ÁREA PADRÃO + VILA + CONDOMÍNIO
+    if tipo_area == "ÁREA PADRÃO + VILA + CONDOMÍNIO":
+        nome_condominio = column_values.get("short_textwh526rz4", {}).get("value", "")
+        lotes_condominio_text = column_values.get("long_textqwhsfkab", {}).get("text", "")
+        lotes_condominio = parse_lotes(lotes_condominio_text)
+
+        nome_vila = column_values.get("long_textiiu35ze7", {}).get("text", "")
+        lotes_vila_text = column_values.get("long_textvmy33h5o", {}).get("text", "")
+        lotes_vila = parse_lotes(lotes_vila_text)
+
+        if nome_condominio and lotes_condominio:
+            agrupamentos[f"Condomínio - {nome_condominio}"] = {
+                "lotes": lotes_condominio
+            }
+
+        if nome_vila and lotes_vila:
+            agrupamentos[f"Vila - {nome_vila}"] = {
+                "lotes": lotes_vila
+            }
+
+    # --------------------------------------------------
+    # RESULTADO FINAL
+    # --------------------------------------------------
 
     return {
-        "codigo": cols["short_text7oz7a7oh"]["value"],
-        "nome_area": cols["short_textofxi61f1"]["value"],
-        "zoneamento": cols["single_selectnlw6vqs"]["label"]["text"],
+        "codigo": codigo,
+        "nome_area": nome_area,
+        "zoneamento": zoneamento,
         "tipo_area": tipo_area,
+        "lotes_totais": lotes_totais,
         "agrupamentos": agrupamentos,
-        "lotes_totais": sorted(lotes_totais)
+        "sender_user_id": sender_user_id
     }
