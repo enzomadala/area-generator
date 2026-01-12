@@ -1,11 +1,19 @@
 import os
 
+DEFAULT_TOKEN = os.getenv("MONDAY_TOKEN")
 
 def get_token_for_user(user_id: int) -> str:
     """
-    Busca o token do Monday com base no userId do evento.
-    Ex: user_id = 27452153 → MONDAY_TOKEN_27452153
+    Retorna o token correto baseado no user_id do evento.
+    - user_id == -6 → formulário / automação → token padrão
+    - user_id >= 0 → token específico do usuário
     """
+
+    # 🔹 Evento vindo de formulário / automação
+    if user_id == -6:
+        if not DEFAULT_TOKEN:
+            raise RuntimeError("MONDAY_TOKEN padrão não configurado")
+        return DEFAULT_TOKEN
 
     env_key = f"MONDAY_TOKEN_{user_id}"
     token = os.getenv(env_key)
