@@ -1,6 +1,7 @@
 import os
 from fastapi import FastAPI, Body
 from dotenv import load_dotenv
+from app.monday.auth import get_token_for_user
 
 load_dotenv()
 
@@ -18,11 +19,8 @@ from app.monday.links import update_link_column
 # CONFIG (com validação)
 # --------------------------------------------------
 
-MONDAY_TOKEN_DEFAULT = os.getenv("MONDAY_TOKEN")
 TEMPLATE_BOARD_ID_RAW = os.getenv("MONDAY_TEMPLATE_BOARD_ID")
 
-if not MONDAY_TOKEN_DEFAULT:
-    raise RuntimeError("Variável MONDAY_TOKEN não configurada")
 
 if not TEMPLATE_BOARD_ID_RAW:
     raise RuntimeError("Variável MONDAY_TEMPLATE_BOARD_ID não configurada")
@@ -54,7 +52,8 @@ async def nova_area(payload: dict = Body(...)):
         print("⚠️ Evento ignorado (sem columnValues)")
         return {"status": "ignored"}
 
-    token = MONDAY_TOKEN_DEFAULT
+    user_id = event["userId"]
+    token = get_token_for_user(user_id)
 
     # 🔹 Parse
     data = parse_payload(payload)
