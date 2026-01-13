@@ -13,16 +13,16 @@ MONDAY_API_URL = "https://api.monday.com/v2"
 
 def duplicate_board(template_board_id: int, board_name: str, token: str) -> int:
     query = """
-    mutation ($board_id: Int!, $name: String!) {
-        duplicate_board(
-            board_id: $board_id,
-            duplicate_type: duplicate_board_with_structure,
-            board_name: $name
-        ) {
-            board {
-                id
-            }
+    mutation ($board_id: ID!, $name: String!) {
+      duplicate_board(
+        board_id: $board_id,
+        duplicate_type: duplicate_board_with_structure,
+        board_name: $name
+      ) {
+        board {
+          id
         }
+      }
     }
     """
 
