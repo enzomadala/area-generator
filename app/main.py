@@ -16,7 +16,6 @@ from app.monday.links import update_link_column
 from app.monday.auth import get_token_for_user
 from app.monday.groups import create_group
 from app.monday.items import create_lote_item
-from app.drive.folders import create_area_structure
 
 
 # --------------------------------------------------
@@ -75,7 +74,7 @@ async def nova_area(payload: dict = Body(...)):
     )
 
     # 🔹 Drive
-    drive_area_id = create_area_structure(
+    drive_area_id = create_area_folders(
     codigo=data["codigo"],
     nome_area=data["nome_area"],
     zoneamento=data["zoneamento"],
