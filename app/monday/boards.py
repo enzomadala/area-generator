@@ -106,42 +106,31 @@ def populate_board_with_lotes(
     agrupamentos: dict,
     token: str
 ):
-    default_group_id = get_default_group(board_id, token)
-    group_map = {}
+    """
+    Cria grupos e itens conforme agrupamentos.
+    """
 
-    for group_name, info in agrupamentos.items():
-        if group_name == "Área Padrão":
-            group_id = default_group_id
-        else:
+    # 🔹 Se houver agrupamentos definidos (Área + Condomínio, etc)
+    if agrupamentos:
+        for group_name, info in agrupamentos.items():
             group_id = create_group(board_id, group_name, token)
 
-        group_map[group_name] = group_id
+            for lote in info["lotes"]:
+                create_item(
+                    board_id=board_id,
+                    group_id=group_id,
+                    item_name=f"Lote {lote}",
+                    token=token
+                )
 
-        for lote in info["lotes"]:
+    # 🔹 Caso simples (sem agrupamentos)
+    else:
+        default_group_id = get_default_group(board_id, token)
+
+        for lote in agrupamentos.get("lotes_totais", []):
             create_item(
                 board_id=board_id,
-                group_id=group_id,
+                group_id=default_group_id,
                 item_name=f"Lote {lote}",
                 token=token
-            )
-
-    # 🔹 Criar apenas grupos adicionais
-    for group_name in agrupamentos.keys():
-        if group_name != "Área Padrão":
-            group_map[group_name] = create_group(
-                board_id,
-                group_name,
-                token
-            )
-
-    # 🔹 Criar items
-    for group_name, data in agrupamentos.items():
-        group_id = group_map[group_name]
-
-        for lote in data["lotes"]:
-            create_item(
-                board_id,
-                group_id,
-                f"Lote {lote}",
-                token
             )

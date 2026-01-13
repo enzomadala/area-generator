@@ -32,15 +32,32 @@ def create_group(board_id: int, group_name: str, token: str) -> str:
 
 def get_default_group(board_id: int, token: str) -> str:
     query = """
-    query ($board_id: [Int]) {
-        boards(ids: $board_id) {
-            groups {
-                id
-                title
-            }
+    query ($board_id: [ID!]) {
+      boards(ids: $board_id) {
+        groups {
+          id
+          title
         }
+      }
     }
     """
 
-    response = monday_request(query, {"board_id": board_id}, token)
-    return response["data"]["boards"][0]["groups"][0]["id"]
+    variables = {"board_id": board_id}
+
+    response = monday_request(query, variables, token)
+
+    # 🔥 PROTEÇÃO OBRIGATÓRIA
+    if "errors" in response:
+        raise RuntimeError(
+            f"Erro ao buscar grupos do board {board_id}: {response['errors']}"
+        )
+
+    boards = response.get("data", {}).get("boards", [])
+
+    if not boards or not boards[0]["groups"]:
+        raise RuntimeError(
+            f"Board {board_id} não retornou grupos (ainda não pronto?)"
+        )
+
+    # Monday sempre cria um grupo default
+    return boards[0]["groups"][0]["id"]
