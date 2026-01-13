@@ -10,19 +10,13 @@ from googleapiclient.errors import HttpError
 # --------------------------------------------------
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
+ROOT_FOLDER_ID = os.getenv("GOOGLE_DRIVE_ROOT_FOLDER_ID")
 
-
-# --------------------------------------------------
-# DRIVE SERVICE
-# --------------------------------------------------
 
 def get_drive_service():
-    service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-
-    if not service_account_json:
-        raise RuntimeError("GOOGLE_SERVICE_ACCOUNT_JSON não configurada")
-
-    credentials_info = json.loads(service_account_json)
+    credentials_info = json.loads(
+        os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    )
 
     credentials = service_account.Credentials.from_service_account_info(
         credentials_info,
@@ -32,28 +26,18 @@ def get_drive_service():
     return build("drive", "v3", credentials=credentials)
 
 
-# --------------------------------------------------
-# HELPERS
-# --------------------------------------------------
-
 def create_folder(service, name: str, parent_id: str) -> str:
-    metadata = {
-        "name": name,
-        "mimeType": "application/vnd.google-apps.folder",
-        "parents": [parent_id],
-    }
-
     folder = service.files().create(
-        body=metadata,
+        body={
+            "name": name,
+            "mimeType": "application/vnd.google-apps.folder",
+            "parents": [parent_id]
+        },
         fields="id"
     ).execute()
 
     return folder["id"]
 
-
-# --------------------------------------------------
-# MAIN
-# --------------------------------------------------
 
 def create_area_folders(
     codigo: str,
@@ -62,74 +46,40 @@ def create_area_folders(
     agrupamentos: Dict,
     lotes_totais: List[int]
 ) -> Dict[str, str]:
-    """
-    Estrutura criada:
 
-    MONDAY (ID fixo)
-      └── 000123 - Nome da Área (ZEU)
-          └── Lotes
-              └── Lote 1
-    """
+    service = get_drive_service()
 
-    try:
-        service = get_drive_service()
+    area_folder_name = f"{codigo} {nome_area} - {zoneamento}"
+    area_folder_id = create_folder(
+        service,
+        area_folder_name,
+        ROOT_FOLDER_ID
+    )
 
-        root_folder_id = os.getenv("GOOGLE_DRIVE_ROOT_FOLDER_ID")
-        if not root_folder_id:
-            raise RuntimeError("GOOGLE_DRIVE_ROOT_FOLDER_ID não configurada")
+    # 🔹 Com agrupamentos
+    if agrupamentos:
+        for group_name, data in agrupamentos.items():
+            group_folder_id = create_folder(
+                service,
+                group_name,
+                area_folder_id
+            )
 
-        # Pasta da área
-        area_folder_name = f"{codigo} {nome_area} - {zoneamento}"
-        area_folder_id = create_folder(
-            service,
-            area_folder_name,
-            root_folder_id
-        )
-
-        # Pasta Lotes
-        lotes_folder_id = create_folder(
-            service,
-            "Lotes",
-            area_folder_id
-        )
-
-        # Subpastas dos lotes
+            for lote in data["lotes"]:
+                create_folder(
+                    service,
+                    f"Lote {lote}",
+                    group_folder_id
+                )
+    else:
+        # 🔹 Caso simples
         for lote in lotes_totais:
             create_folder(
                 service,
                 f"Lote {lote}",
-                lotes_folder_id
+                area_folder_id
             )
 
-        return {
-            "area_folder_id": area_folder_id,
-            "lotes_folder_id": lotes_folder_id,
-        }
-
-    except HttpError as e:
-        raise RuntimeError(f"Erro ao criar pastas no Drive: {e}")
-    
-def create_area_structure(
-    codigo: str,
-    nome_area: str,
-    zoneamento: str,
-    agrupamentos: dict,
-):
-    service = get_drive_service()
-
-    root_id = os.getenv("GOOGLE_DRIVE_ROOT_FOLDER_ID")
-
-    area_name = f"{codigo} {nome_area} - {zoneamento}"
-    area_id = create_folder(service, area_name, root_id)
-
-    for group_name, data in agrupamentos.items():
-        group_folder_id = create_folder(service, group_name, area_id)
-
-        for lote in data["lotes"]:
-            create_folder(
-                service,
-                f"Lote {lote}",
-                group_folder_id
-            )
-
-    return area_id
+    return {
+        "area_folder_id": area_folder_id
+    }

@@ -1,8 +1,10 @@
 import requests
 import json
 
+MONDAY_API_URL = "https://api.monday.com/v2"
 
-def create_group(board_id: int, group_name: str, token: str) -> str | None:
+
+def create_group(board_id: int, group_name: str, token: str) -> str:
     query = """
     mutation ($board_id: ID!, $group_name: String!) {
         create_group(board_id: $board_id, group_name: $group_name) {
@@ -17,19 +19,12 @@ def create_group(board_id: int, group_name: str, token: str) -> str | None:
     }
 
     response = requests.post(
-        "https://api.monday.com/v2",
+        MONDAY_API_URL,
         json={"query": query, "variables": variables},
-        headers={
-            "Authorization": token,
-            "Content-Type": "application/json"
-        }
-    )
- 
-    data = response.json()
+        headers={"Authorization": token}
+    ).json()
 
-    # 🔹 Tratamento seguro (importantíssimo)
-    if "errors" in data:
-        print("❌ Erro ao criar group:", data["errors"])
-        return None
+    if "errors" in response:
+        raise RuntimeError(response["errors"])
 
-    return data["data"]["create_group"]["id"]
+    return response["data"]["create_group"]["id"]
