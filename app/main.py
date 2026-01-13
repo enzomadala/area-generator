@@ -75,11 +75,12 @@ async def nova_area(payload: dict = Body(...)):
 
     # 🔹 Drive
     drive_area_id = create_area_folders(
-    codigo=data["codigo"],
-    nome_area=data["nome_area"],
-    zoneamento=data["zoneamento"],
-    agrupamentos=data["agrupamentos"]
-)
+        codigo=data["codigo"],
+        nome_area=data["nome_area"],
+        zoneamento=data["zoneamento"],
+        agrupamentos=data["agrupamentos"],
+        lotes_totais=data["lotes_totais"]
+    )
 
     # 🔹 Board (CRIA COM OWNER CORRETO)
     board_name = f"{data['codigo']} {data['nome_area']} - {data['zoneamento']}"
