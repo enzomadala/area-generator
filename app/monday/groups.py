@@ -1,5 +1,6 @@
 import requests
 import json
+from app.monday.client import monday_request
 
 MONDAY_API_URL = "https://api.monday.com/v2"
 
@@ -28,3 +29,18 @@ def create_group(board_id: int, group_name: str, token: str) -> str:
         raise RuntimeError(response["errors"])
 
     return response["data"]["create_group"]["id"]
+
+def get_default_group(board_id: int, token: str) -> str:
+    query = """
+    query ($board_id: [Int]) {
+        boards(ids: $board_id) {
+            groups {
+                id
+                title
+            }
+        }
+    }
+    """
+
+    response = monday_request(query, {"board_id": board_id}, token)
+    return response["data"]["boards"][0]["groups"][0]["id"]

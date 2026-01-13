@@ -10,8 +10,10 @@ from googleapiclient.errors import HttpError
 # --------------------------------------------------
 
 SCOPES = ["https://www.googleapis.com/auth/drive"]
-ROOT_FOLDER_ID = os.getenv("GOOGLE_DRIVE_ROOT_FOLDER_ID")
+DRIVE_ROOT_FOLDER_ID = os.getenv("GOOGLE_DRIVE_ROOT_FOLDER_ID")
 
+if not DRIVE_ROOT_FOLDER_ID:
+        raise RuntimeError("Variável GOOGLE_DRIVE_ROOT_FOLDER_ID")
 
 def get_drive_service():
     credentials_info = json.loads(
@@ -43,18 +45,21 @@ def create_area_folders(
     codigo: str,
     nome_area: str,
     zoneamento: str,
-    agrupamentos: Dict,
-    lotes_totais: List[int]
-) -> Dict[str, str]:
-
+    agrupamentos: dict,
+    lotes_totais: list
+):
     service = get_drive_service()
 
     area_folder_name = f"{codigo} {nome_area} - {zoneamento}"
-    area_folder_id = create_folder(
-        service,
-        area_folder_name,
-        ROOT_FOLDER_ID
-    )
+    area_folder_id = create_folder(service, area_folder_name, DRIVE_ROOT_FOLDER_ID)
+
+    for group_name, info in agrupamentos.items():
+        group_folder_id = create_folder(service, group_name, area_folder_id)
+
+        for lote in info["lotes"]:
+            create_folder(service, f"Lote {lote}", group_folder_id)
+
+    return {"area_folder_id": area_folder_id}
 
     # 🔹 Com agrupamentos
     if agrupamentos:

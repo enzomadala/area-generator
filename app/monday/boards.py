@@ -1,5 +1,8 @@
 import requests
 from app.monday.groups import create_group
+from app.monday.client import monday_request
+from app.monday.groups import create_group, get_default_group
+from app.monday.items import create_item
 
 MONDAY_API_URL = "https://api.monday.com/v2"
 
@@ -8,17 +11,13 @@ MONDAY_API_URL = "https://api.monday.com/v2"
 # DUPLICAR BOARD
 # --------------------------------------------------
 
-def duplicate_board(
-    template_board_id: int,
-    board_name: str,
-    token: str
-) -> int:
+def duplicate_board(template_board_id: int, board_name: str, token: str) -> int:
     query = """
-    mutation ($board_id: ID!, $board_name: String!) {
+    mutation ($board_id: Int!, $name: String!) {
         duplicate_board(
             board_id: $board_id,
-            board_name: $board_name,
-            duplicate_type: with_structure
+            duplicate_type: duplicate_board_with_structure,
+            board_name: $name
         ) {
             board {
                 id
@@ -29,14 +28,10 @@ def duplicate_board(
 
     variables = {
         "board_id": template_board_id,
-        "board_name": board_name
+        "name": board_name
     }
 
-    response = requests.post(
-        MONDAY_API_URL,
-        json={"query": query, "variables": variables},
-        headers={"Authorization": token}
-    ).json()
+    response = monday_request(query, variables, token)
 
     if "errors" in response:
         raise RuntimeError(response["errors"])
@@ -111,14 +106,24 @@ def populate_board_with_lotes(
     agrupamentos: dict,
     token: str
 ):
-    groups = get_board_groups(board_id, token)
+    default_group_id = get_default_group(board_id, token)
+    group_map = {}
 
-    # 🔹 Primeiro grupo nativo = Área Padrão
-    default_group_id = groups[0]["id"]
+    for group_name, info in agrupamentos.items():
+        if group_name == "Área Padrão":
+            group_id = default_group_id
+        else:
+            group_id = create_group(board_id, group_name, token)
 
-    group_map = {
-        "Área Padrão": default_group_id
-    }
+        group_map[group_name] = group_id
+
+        for lote in info["lotes"]:
+            create_item(
+                board_id=board_id,
+                group_id=group_id,
+                item_name=f"Lote {lote}",
+                token=token
+            )
 
     # 🔹 Criar apenas grupos adicionais
     for group_name in agrupamentos.keys():
