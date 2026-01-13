@@ -2,7 +2,7 @@ import requests
 from app.monday.groups import create_group
 from app.monday.client import monday_request
 from app.monday.groups import create_group, get_default_group
-from app.monday.items import create_item
+from app.monday.items import create_lote_item
 
 MONDAY_API_URL = "https://api.monday.com/v2"
 
