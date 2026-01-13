@@ -1,9 +1,52 @@
 import requests
 from app.monday.groups import create_group
-from app.monday.items import create_lote_item
 
 MONDAY_API_URL = "https://api.monday.com/v2"
 
+
+# --------------------------------------------------
+# DUPLICAR BOARD
+# --------------------------------------------------
+
+def duplicate_board(
+    template_board_id: int,
+    board_name: str,
+    token: str
+) -> int:
+    query = """
+    mutation ($board_id: ID!, $board_name: String!) {
+        duplicate_board(
+            board_id: $board_id,
+            board_name: $board_name,
+            duplicate_type: with_structure
+        ) {
+            board {
+                id
+            }
+        }
+    }
+    """
+
+    variables = {
+        "board_id": template_board_id,
+        "board_name": board_name
+    }
+
+    response = requests.post(
+        MONDAY_API_URL,
+        json={"query": query, "variables": variables},
+        headers={"Authorization": token}
+    ).json()
+
+    if "errors" in response:
+        raise RuntimeError(response["errors"])
+
+    return int(response["data"]["duplicate_board"]["board"]["id"])
+
+
+# --------------------------------------------------
+# GROUPS
+# --------------------------------------------------
 
 def get_board_groups(board_id: int, token: str) -> list:
     query = """
@@ -25,6 +68,10 @@ def get_board_groups(board_id: int, token: str) -> list:
 
     return response["data"]["boards"][0]["groups"]
 
+
+# --------------------------------------------------
+# ITEMS
+# --------------------------------------------------
 
 def create_item(board_id: int, group_id: str, name: str, token: str):
     query = """
@@ -55,6 +102,10 @@ def create_item(board_id: int, group_id: str, name: str, token: str):
         raise RuntimeError(response["errors"])
 
 
+# --------------------------------------------------
+# POPULAR BOARD
+# --------------------------------------------------
+
 def populate_board_with_lotes(
     board_id: int,
     agrupamentos: dict,
@@ -62,14 +113,14 @@ def populate_board_with_lotes(
 ):
     groups = get_board_groups(board_id, token)
 
-    # 🔹 Primeiro group do board = Área Padrão
+    # 🔹 Primeiro grupo nativo = Área Padrão
     default_group_id = groups[0]["id"]
 
     group_map = {
         "Área Padrão": default_group_id
     }
 
-    # 🔹 Cria apenas os groups adicionais
+    # 🔹 Criar apenas grupos adicionais
     for group_name in agrupamentos.keys():
         if group_name != "Área Padrão":
             group_map[group_name] = create_group(
@@ -78,7 +129,7 @@ def populate_board_with_lotes(
                 token
             )
 
-    # 🔹 Criação dos items
+    # 🔹 Criar items
     for group_name, data in agrupamentos.items():
         group_id = group_map[group_name]
 
