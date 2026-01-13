@@ -1,3 +1,5 @@
+from typing import Dict, List
+
 def parse_lotes(text: str):
     """
     Converte '1,2,3,4' -> [1,2,3,4]
