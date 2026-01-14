@@ -7,7 +7,7 @@ MONDAY_API_URL = "https://api.monday.com/v2"
 
 def create_group(board_id: int, group_name: str, token: str) -> str:
     query = """
-    mutation ($board_id: Int!, $group_name: String!) {
+    mutation ($board_id: ID!, $group_name: String!) {
       create_group(board_id: $board_id, group_name: $group_name) {
         id
       }
@@ -29,7 +29,7 @@ def create_group(board_id: int, group_name: str, token: str) -> str:
 
 def get_default_group(board_id: int, token: str) -> str:
     query = """
-    query ($board_id: [Int]) {
+    query ($board_id: [ID!]) {
       boards(ids: $board_id) {
         groups {
           id
@@ -48,10 +48,4 @@ def get_default_group(board_id: int, token: str) -> str:
     if "errors" in response:
         raise RuntimeError(response["errors"])
 
-    boards = response.get("data", {}).get("boards", [])
-
-    if not boards or not boards[0]["groups"]:
-        raise RuntimeError(f"Board {board_id} não possui grupos")
-
-    # Grupo nativo do Monday (primeiro)
-    return boards[0]["groups"][0]["id"]
+    return response["data"]["boards"][0]["groups"][0]["id"]
