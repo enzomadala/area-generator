@@ -7,10 +7,10 @@ MONDAY_API_URL = "https://api.monday.com/v2"
 
 def create_group(board_id: int, group_name: str, token: str) -> str:
     query = """
-    mutation ($board_id: ID!, $group_name: String!) {
-        create_group(board_id: $board_id, group_name: $group_name) {
-            id
-        }
+    mutation ($board_id: Int!, $group_name: String!) {
+      create_group(board_id: $board_id, group_name: $group_name) {
+        id
+      }
     }
     """
 
@@ -19,20 +19,17 @@ def create_group(board_id: int, group_name: str, token: str) -> str:
         "group_name": group_name
     }
 
-    response = requests.post(
-        MONDAY_API_URL,
-        json={"query": query, "variables": variables},
-        headers={"Authorization": token}
-    ).json()
+    response = monday_request(query, variables, token)
 
     if "errors" in response:
         raise RuntimeError(response["errors"])
 
     return response["data"]["create_group"]["id"]
 
+
 def get_default_group(board_id: int, token: str) -> str:
     query = """
-    query ($board_id: [ID!]) {
+    query ($board_id: [Int]) {
       boards(ids: $board_id) {
         groups {
           id
@@ -42,22 +39,19 @@ def get_default_group(board_id: int, token: str) -> str:
     }
     """
 
-    variables = {"board_id": board_id}
+    variables = {
+        "board_id": board_id
+    }
 
     response = monday_request(query, variables, token)
 
-    # 🔥 PROTEÇÃO OBRIGATÓRIA
     if "errors" in response:
-        raise RuntimeError(
-            f"Erro ao buscar grupos do board {board_id}: {response['errors']}"
-        )
+        raise RuntimeError(response["errors"])
 
     boards = response.get("data", {}).get("boards", [])
 
     if not boards or not boards[0]["groups"]:
-        raise RuntimeError(
-            f"Board {board_id} não retornou grupos (ainda não pronto?)"
-        )
+        raise RuntimeError(f"Board {board_id} não possui grupos")
 
-    # Monday sempre cria um grupo default
+    # Grupo nativo do Monday (primeiro)
     return boards[0]["groups"][0]["id"]

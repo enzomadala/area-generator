@@ -107,13 +107,19 @@ def populate_board_with_lotes(
     token: str
 ):
     """
-    Cria grupos e itens conforme agrupamentos.
+    Cria grupos e itens no board.
+    - Se houver agrupamentos: cria grupos customizados
+    - Se NÃO houver: usa o grupo default (caso simples)
     """
 
-    # 🔹 Se houver agrupamentos definidos (Área + Condomínio, etc)
-    if agrupamentos:
+    # 🔹 CASO 1: ÁREA COM AGRUPAMENTOS (condomínio, vila, misto)
+    if agrupamentos and len(agrupamentos.keys()) > 0:
         for group_name, info in agrupamentos.items():
-            group_id = create_group(board_id, group_name, token)
+            group_id = create_group(
+                board_id=board_id,
+                group_name=group_name,
+                token=token
+            )
 
             for lote in info["lotes"]:
                 create_item(
@@ -123,14 +129,19 @@ def populate_board_with_lotes(
                     token=token
                 )
 
-    # 🔹 Caso simples (sem agrupamentos)
-    else:
-        default_group_id = get_default_group(board_id, token)
+        # ⚠️ MUITO IMPORTANTE
+        # NÃO pode continuar execução
+        return
 
-        for lote in agrupamentos.get("lotes_totais", []):
-            create_item(
-                board_id=board_id,
-                group_id=default_group_id,
-                item_name=f"Lote {lote}",
-                token=token
-            )
+    # 🔹 CASO 2: ÁREA SIMPLES (fallback, quase não usado hoje)
+    from app.monday.groups import get_default_group
+
+    default_group_id = get_default_group(board_id, token)
+
+    for lote in agrupamentos.get("lotes_totais", []):
+        create_item(
+            board_id=board_id,
+            group_id=default_group_id,
+            item_name=f"Lote {lote}",
+            token=token
+        )
