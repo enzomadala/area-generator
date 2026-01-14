@@ -14,20 +14,14 @@ from app.monday.boards import duplicate_board, populate_board_with_lotes
 from app.monday.status import set_status
 from app.monday.links import update_link_column
 from app.monday.auth import get_token_for_user
-from app.monday.groups import create_group
-from app.monday.items import create_item
-
 
 # --------------------------------------------------
 # CONFIG
 # --------------------------------------------------
 
-TEMPLATE_BOARD_ID_RAW = os.getenv("MONDAY_TEMPLATE_BOARD_ID")
-
-if not TEMPLATE_BOARD_ID_RAW:
-    raise RuntimeError("Variável MONDAY_TEMPLATE_BOARD_ID não configurada")
-
-TEMPLATE_BOARD_ID = int(TEMPLATE_BOARD_ID_RAW)
+TEMPLATE_BOARD_ID = os.getenv("MONDAY_TEMPLATE_BOARD_ID")
+if not TEMPLATE_BOARD_ID:
+    raise RuntimeError("MONDAY_TEMPLATE_BOARD_ID não configurado")
 
 STATUS_COLUMN_ID = "color_mkzdtnz7"
 BOARD_LINK_COLUMN_ID = "link_mkzeye6w"
@@ -42,30 +36,22 @@ async def nova_area(payload: dict = Body(...)):
     print("\n🚀 Nova requisição /nova-area")
     print("📦 PAYLOAD:", payload)
 
-    # 🔹 Handshake Monday
+    # Handshake Monday
     if "challenge" in payload:
         return {"challenge": payload["challenge"]}
 
     event = payload.get("event", {})
-    column_values = event.get("columnValues")
-
-    if not column_values:
-        print("⚠️ Evento ignorado (sem columnValues)")
+    if not event.get("columnValues"):
         return {"status": "ignored"}
 
-    # 🔹 Parse
     data = parse_payload(payload)
     print("🧠 DADOS PARSEADOS:", data)
 
-    sender_user_id = data["sender_user_id"]
+    token = get_token_for_user(data["sender_user_id"])
 
-    # 🔹 TOKEN DO USUÁRIO QUE ENVIOU
-    token = get_token_for_user(sender_user_id)
+    form_board_id = str(event["boardId"])
+    form_item_id = str(event["pulseId"])
 
-    form_board_id = event["boardId"]
-    form_item_id = event["pulseId"]
-
-    # 🔹 Status → processando
     set_status(
         board_id=form_board_id,
         item_id=form_item_id,
@@ -73,7 +59,7 @@ async def nova_area(payload: dict = Body(...)):
         token=token
     )
 
-    # 🔹 Drive
+    # DRIVE
     drive_area_id = create_area_folders(
         codigo=data["codigo"],
         nome_area=data["nome_area"],
@@ -82,13 +68,13 @@ async def nova_area(payload: dict = Body(...)):
         lotes_totais=data["lotes_totais"]
     )
 
-    # 🔹 Board (CRIA COM OWNER CORRETO)
+    # BOARD
     board_name = f"{data['codigo']} {data['nome_area']} - {data['zoneamento']}"
 
     new_board_id = duplicate_board(
-        TEMPLATE_BOARD_ID,
-        board_name,
-        token
+        template_board_id=str(TEMPLATE_BOARD_ID),
+        board_name=board_name,
+        token=token
     )
 
     populate_board_with_lotes(
@@ -97,7 +83,6 @@ async def nova_area(payload: dict = Body(...)):
         token=token
     )
 
-    # 🔹 Links no formulário
     update_link_column(
         board_id=form_board_id,
         item_id=form_item_id,
@@ -116,7 +101,6 @@ async def nova_area(payload: dict = Body(...)):
         token=token
     )
 
-    # 🔹 Status → sucesso
     set_status(
         board_id=form_board_id,
         item_id=form_item_id,
