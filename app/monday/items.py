@@ -86,7 +86,7 @@ def update_text_column(
         raise Exception(result["errors"])
 
 
-def create_lote_item(
+def create_item(
     board_id: int,
     group_id: str,
     item_name: str,

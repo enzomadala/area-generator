@@ -15,7 +15,7 @@ from app.monday.status import set_status
 from app.monday.links import update_link_column
 from app.monday.auth import get_token_for_user
 from app.monday.groups import create_group
-from app.monday.items import create_lote_item
+from app.monday.items import create_item
 
 
 # --------------------------------------------------
