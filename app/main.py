@@ -72,9 +72,9 @@ async def nova_area(payload: dict = Body(...)):
     board_name = f"{data['codigo']} {data['nome_area']} - {data['zoneamento']}"
 
     new_board_id = duplicate_board(
-        template_board_id=str(TEMPLATE_BOARD_ID),
-        board_name=board_name,
-        token=token
+        TEMPLATE_BOARD_ID,
+        board_name,
+        token
     )
 
     populate_board_with_lotes(
